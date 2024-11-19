@@ -3,9 +3,101 @@ import numpy as np
 from deepmd.env import tf
 from deepmd.env import GLOBAL_TF_FLOAT_PRECISION
 from deepmd.common import get_precision
+from deepmd.utils.spline import curve2coeff,coeff2curve
 
 def one_layer_rand_seed_shift():
     return 3
+
+def one_kan_layer(inputs, 
+                  outputs_size, 
+                  precision = GLOBAL_TF_FLOAT_PRECISION, 
+                  name='linear', 
+                  reuse=None,
+                  initial_variables = None,
+                  mixed_prec = None,
+                  final_layer = False,
+                  bavg=0.0,
+
+                  base_function='b_spline',
+                  k=3,
+                  grid_range=[-1,1],
+                  num=5,
+                  noise_scale=0.1,
+                  scale_base=1.0,
+                  bias_function='silu',
+                  scale_bias_miu=0.0,
+                  scale_bias_sigma=1.0,
+                  bias_trainable=True,
+                  base_trainable=True
+                  ):
+    # For good accuracy, the last layer of the fitting network uses a higher precision neuron network.
+    #bavg: the atomic energy shift
+    if mixed_prec is not None and final_layer:
+        inputs = tf.cast(inputs, get_precision(mixed_prec['output_prec']))
+    with tf.variable_scope(name, reuse=reuse):
+        shape = inputs.get_shape().as_list()
+
+        if base_function=='b_spline':
+            #the global grids for one layer, it should be in graph 
+            #shape (in_dim, num+2k+1)
+            delta_l=(grid_range[-1]-grid_range[0])/num
+            grids=tf.linspace(grid_range[0]-k*delta_l,grid_range[-1]+delta_l*k,num+1+2*k)
+            grids=tf.cast(grids,precision)
+            grids=tf.tile(tf.extend_dim(grids,0),[shape[1],1])
+            
+            #the initialization of coeff on spline matrix (the base function):
+            #[[sp_11,sp_12,...,sp_1m],\
+            # [sp_11,sp_12,...,sp_1m],\
+            # ...
+            # [sp_n1,sp_n2,...,sp_nm]
+            #]
+            #shape (in_dim,out_dim,num+k or G+k)
+            #and other trainable variables
+            if initial_variables is not None:
+                coeff_initializer=tf.constant_initializer(initial_variables[name + '/coeff'])
+                scale_base_initializer=tf.constant_initializer(initial_variables[name+'/scale_base'])
+                scale_bias_initializer=tf.constant_initializer(initial_variables[name+'/scale_bias'])
+            else:
+                noise=noise_scale*tf.random.uniform([num+1,shape[1],outputs_size],-0.5,0.5,precision)/num
+                coeff_initializer=curve2coeff(tf.transpose(grids)[k:-k,:],noise,grids,k)
+                scale_base_initializer=tf.ones([shape[1],outputs_size],dtype=precision)*scale_base
+                scale_bias_initializer=scale_bias_sigma*tf.random.uniform([shape[1],outputs_size],-1,1,dtype=precision)/tf.sqrt(tf.constant(shape[1],dtype=precision))+\
+                                       scale_bias_miu/tf.sqrt(tf.constant(shape[1],dtype=precision))
+            coeff=tf.get_variable('coeff',
+                                  [shape[1],outputs_size,num+k],
+                                  precision,
+                                  coeff_initializer,
+                                  trainable=True)
+            variable_summaries(coeff, 'coeff')
+            scale_base=tf.get_variable('scale_base',
+                                       [shape[1],outputs_size],
+                                       precision,
+                                       scale_base_initializer,
+                                       trainable=base_trainable)
+            variable_summaries(scale_base, 'scale_base')
+            scale_bias=tf.get_variable('scale_bias',
+                                       [shape[1],outputs_size],
+                                       precision,
+                                       scale_bias_initializer,
+                                       trainable=bias_trainable)
+            variable_summaries(scale_base, 'scale_base')
+
+            #forward propagation
+            if mixed_prec is not None and not final_layer:
+                inputs=tf.cast(inputs,get_precision(mixed_prec['compute_prec']))
+                grids=tf.cast(grids,get_precision(mixed_prec['compute_prec']))
+                coeff=tf.cast(coeff,get_precision(mixed_prec['compute_prec']))
+                scale_bias=tf.cast(scale_bias,get_precision(mixed_prec['compute_prec']))
+                scale_base=tf.cast(scale_base,get_precision(mixed_prec['compute_prec']))
+
+            hidden_base=coeff2curve(inputs,grids,k,coeff)*scale_base
+            if bias_function=='silu':
+                hidden_bias=tf.tile(tf.expand_dims(inputs,axis=-1),[1,1,outputs_size])
+                hidden_bias=tf.nn.silu(hidden_base)*scale_bias
+            
+            hidden=tf.reduce_sum(hidden_base+hidden_bias,axis=-1)
+            return hidden+bavg
+
 
 def one_layer(inputs, 
               outputs_size, 

@@ -13,7 +13,7 @@ from deepmd.env import tf
 from deepmd.env import get_tf_session_config
 from deepmd.env import GLOBAL_TF_FLOAT_PRECISION
 from deepmd.env import GLOBAL_ENER_FLOAT_PRECISION
-from deepmd.fit import EnerFitting, WFCFitting, PolarFittingLocFrame, PolarFittingSeA, GlobalPolarFittingSeA, DipoleFittingSeA
+from deepmd.fit import KanEnerFitting, EnerFitting, WFCFitting, PolarFittingLocFrame, PolarFittingSeA, GlobalPolarFittingSeA, DipoleFittingSeA
 from deepmd.descriptor import Descriptor
 from deepmd.model import EnerModel, WFCModel, DipoleModel, PolarModel, GlobalPolarModel
 from deepmd.loss import EnerStdLoss, EnerDipoleLoss, TensorLoss
@@ -78,6 +78,11 @@ class DPTrainer (object):
         fitting_param['descrpt'] = self.descrpt
         if fitting_type == 'ener':
             self.fitting = EnerFitting(**fitting_param)
+
+        # the KAN based fitting network 
+        elif fitting_type == 'ener_kan':            
+             self.fitting = KanEnerFitting(**fitting_param)       
+
         # elif fitting_type == 'wfc':            
         #     self.fitting = WFCFitting(fitting_param, self.descrpt)
         elif fitting_type == 'dipole':
@@ -179,7 +184,7 @@ class DPTrainer (object):
         loss_param = jdata.get('loss', None)
         loss_type = loss_param.get('type', 'ener')
 
-        if fitting_type == 'ener':
+        if fitting_type in ['ener','ener_kan']:
             loss_param.pop('type', None)
             loss_param['starter_learning_rate'] = self.lr.start_lr()
             if loss_type == 'ener':
@@ -239,7 +244,7 @@ class DPTrainer (object):
         # self.sys_probs = tr_data['sys_probs']
         # self.auto_prob_style = tr_data['auto_prob']
         self.useBN = False
-        if fitting_type == 'ener' and  self.fitting.get_numb_fparam() > 0 :
+        if fitting_type in ['ener','ener_kan'] and  self.fitting.get_numb_fparam() > 0 :
             self.numb_fparam = self.fitting.get_numb_fparam()
         else :
             self.numb_fparam = 0
@@ -294,7 +299,7 @@ class DPTrainer (object):
             self.descrpt.enable_compression(self.model_param['compress']["min_nbor_dist"], self.model_param['compress']['model_file'], self.model_param['compress']['table_config'][0], self.model_param['compress']['table_config'][1], self.model_param['compress']['table_config'][2], self.model_param['compress']['table_config'][3])
             self.fitting.init_variables(self.model_param['compress']['model_file'])
             # for fparam or aparam settings in 'ener' type fitting net
-            if self.fitting_type == 'ener':
+            if self.fitting_type in ['ener','ener_kan']:
                 self.fitting.enable_compression(self.model_param['compress']['model_file'])
         
         if self.is_compress or self.model_type == 'compressed_model':
@@ -682,7 +687,7 @@ class DPTrainer (object):
                     "which is not supported by the 'dp train init-frz-model' interface. " % self.run_opt.init_frz_model
                 ) from e
         
-        if self.fitting_type != 'ener':
+        if self.fitting_type not in  ['ener','ener_kan']:
             raise RuntimeError("The 'dp train init-frz-model' command only supports the 'ener' type fitting net currently!")
         # self.frz_model will control the self.model to import the descriptor from the given frozen model instead of building from scratch...
         # initialize fitting net with the given compressed frozen model
