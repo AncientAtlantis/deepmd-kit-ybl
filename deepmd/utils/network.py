@@ -43,7 +43,7 @@ def one_kan_layer(inputs,
             delta_l=(grid_range[-1]-grid_range[0])/num
             grids=tf.linspace(grid_range[0]-k*delta_l,grid_range[-1]+delta_l*k,num+1+2*k)
             grids=tf.cast(grids,precision)
-            grids=tf.tile(tf.extend_dim(grids,0),[shape[1],1])
+            grids=tf.tile(tf.expand_dims(grids,0),[shape[1],1])
             
             #the initialization of coeff on spline matrix (the base function):
             #[[sp_11,sp_12,...,sp_1m],\
@@ -63,22 +63,20 @@ def one_kan_layer(inputs,
                 scale_base_initializer=tf.ones([shape[1],outputs_size],dtype=precision)*scale_base
                 scale_bias_initializer=scale_bias_sigma*tf.random.uniform([shape[1],outputs_size],-1,1,dtype=precision)/tf.sqrt(tf.constant(shape[1],dtype=precision))+\
                                        scale_bias_miu/tf.sqrt(tf.constant(shape[1],dtype=precision))
+
             coeff=tf.get_variable('coeff',
-                                  [shape[1],outputs_size,num+k],
-                                  precision,
-                                  coeff_initializer,
+                                  dtype=precision,
+                                  initializer=coeff_initializer,
                                   trainable=True)
             variable_summaries(coeff, 'coeff')
             scale_base=tf.get_variable('scale_base',
-                                       [shape[1],outputs_size],
-                                       precision,
-                                       scale_base_initializer,
+                                       dtype=precision,
+                                       initializer=scale_base_initializer,
                                        trainable=base_trainable)
             variable_summaries(scale_base, 'scale_base')
             scale_bias=tf.get_variable('scale_bias',
-                                       [shape[1],outputs_size],
-                                       precision,
-                                       scale_bias_initializer,
+                                       dtype=precision,
+                                       initializer=scale_bias_initializer,
                                        trainable=bias_trainable)
             variable_summaries(scale_base, 'scale_base')
 
@@ -91,11 +89,22 @@ def one_kan_layer(inputs,
                 scale_base=tf.cast(scale_base,get_precision(mixed_prec['compute_prec']))
 
             hidden_base=coeff2curve(inputs,grids,k,coeff)*scale_base
+
+            #print('test out')
+            #print('inputs',inputs)
+            #print('hidden_base',hidden_base)
+
             if bias_function=='silu':
                 hidden_bias=tf.tile(tf.expand_dims(inputs,axis=-1),[1,1,outputs_size])
                 hidden_bias=tf.nn.silu(hidden_base)*scale_bias
             
-            hidden=tf.reduce_sum(hidden_base+hidden_bias,axis=-1)
+            hidden=tf.reduce_sum(hidden_base+hidden_bias,axis=-2)
+
+            #print('coeff',coeff)
+            #print('scale_base',scale_base)
+            #print('scale_bias',scale_bias)
+            #print('hidden',hidden)
+
             return hidden+bavg
 
 

@@ -120,7 +120,7 @@ class DPTrainer (object):
 
         # init model
         # infer model type by fitting_type
-        if fitting_type == 'ener':
+        if fitting_type in [ 'ener','ener_kan']:
             self.model = EnerModel(
                 self.descrpt, 
                 self.fitting, 

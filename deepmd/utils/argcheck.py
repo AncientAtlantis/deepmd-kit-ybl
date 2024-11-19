@@ -277,6 +277,46 @@ def fitting_ener():
         Argument("atom_ener", list, optional = True, default = [], doc = doc_atom_ener)
     ]
 
+def fitting_ener_kan():
+    doc_numb_fparam = 'The dimension of the frame parameter. If set to >0, file `fparam.npy` should be included to provided the input fparams.'
+    doc_numb_aparam = 'The dimension of the atomic parameter. If set to >0, file `aparam.npy` should be included to provided the input aparams.'
+    doc_neuron = 'The number of neurons in each hidden layers of the fitting net. When two hidden layers are of the same size, a skip connection is built.'
+    doc_precision = f'The precision of the fitting net parameters, supported options are {list_to_doc(PRECISION_DICT.keys())}'
+    doc_rcond = 'The condition number used to determine the inital energy shift for each type of atoms.'
+    doc_atom_ener = 'Specify the atomic energy in vacuum for each type'
+
+    doc_base_function = 'The type of trainable single variable function'
+    doc_k = 'The order of B-spline function (0 based)'
+    doc_grid_range = 'The initial grid range for B-spline function'
+    doc_num = 'Number of grids intervals'
+    doc_noise_scale = 'The initial spline curves'
+    doc_scale_base = 'The scale factor of base function'
+    doc_bias_function = 'The type of bias function'
+    doc_scale_bias_miu = 'The initialization factor of bias function'
+    doc_scale_bias_sigma = 'The initialization factor of bias function'
+    doc_bias_trainable = 'Specify the trainable of bias function'
+    doc_base_trainable = 'The base functioin trainable'
+
+    return [
+        Argument("numb_fparam", int, optional = True, default = 0, doc = doc_numb_fparam),
+        Argument("numb_aparam", int, optional = True, default = 0, doc = doc_numb_aparam),
+        Argument("neuron", list, optional = True, default = [120,120,120], alias = ['n_neuron'], doc = doc_neuron),
+        Argument("precision", str, optional = True, default = 'float64', doc = doc_precision),
+        Argument("rcond", float, optional = True, default = 1e-3, doc = doc_rcond),
+        Argument("atom_ener", list, optional = True, default = [], doc = doc_atom_ener),
+        Argument("base_function", str, optional = True, default = 'b_spline', doc = doc_base_function),
+        Argument("k", int, optional = True, default = 3, doc = doc_k),
+        Argument("grid_range", list, optional = True, default = [-1,1], doc = doc_grid_range),
+        Argument("num", int, optional = True, default = 5, doc = doc_num),
+        Argument("noise_scale", float, optional = True, default = 0.1, doc = doc_noise_scale),
+        Argument("scale_base", float, optional = True, default = 1.0, doc = doc_scale_base),
+        Argument("bias_function", str, optional = True, default = 'silu', doc = doc_bias_function),
+        Argument("scale_bias_miu", float, optional = True, default = 0.0, doc = doc_scale_bias_miu),
+        Argument("scale_bias_sigma", float, optional = True, default = 1.0, doc = doc_scale_bias_sigma),
+        Argument("bias_trainable", bool, optional = True, default = True, doc = doc_bias_trainable),
+        Argument("base_trainable", bool, optional = True, default = True, doc = doc_base_trainable)
+    ]
+
 
 def fitting_polar():
     doc_neuron = 'The number of neurons in each hidden layers of the fitting net. When two hidden layers are of the same size, a skip connection is built.'
@@ -330,10 +370,12 @@ def fitting_dipole():
 def fitting_variant_type_args():
     doc_descrpt_type = 'The type of the fitting. See explanation below. \n\n\
 - `ener`: Fit an energy model (potential energy surface).\n\n\
+- `ener_kan`: Fit an energy model with kan network (potential energy surface).\n\n\
 - `dipole`: Fit an atomic dipole model. Global dipole labels or atomic dipole labels for all the selected atoms (see `sel_type`) should be provided by `dipole.npy` in each data system. The file either has number of frames lines and 3 times of number of selected atoms columns, or has number of frames lines and 3 columns. See `loss` parameter.\n\n\
 - `polar`: Fit an atomic polarizability model. Global polarizazbility labels or atomic polarizability labels for all the selected atoms (see `sel_type`) should be provided by `polarizability.npy` in each data system. The file eith has number of frames lines and 9 times of number of selected atoms columns, or has number of frames lines and 9 columns. See `loss` parameter.\n\n'
 
     return Variant("type", [Argument("ener", dict, fitting_ener()),
+                            Argument("ener_kan", dict, fitting_ener_kan()),
                             Argument("dipole", dict, fitting_dipole()),
                             Argument("polar", dict, fitting_polar()),
                             ], 
