@@ -381,6 +381,10 @@ class DPTrainer (object):
                                       global_step=self.global_step,
                                       var_list=trainable_variables,
                                       name='train_step')
+        #test block
+        self.grads_and_vars=optimizer.compute_gradients(self.l2_l,trainable_variables)
+        #test block
+
         train_ops = [apply_op] + self._extra_train_ops
         self.train_op = tf.group(*train_ops)
         log.info("built training")
@@ -509,6 +513,15 @@ class DPTrainer (object):
             else:
                 run_sess(self.sess, [self.train_op], feed_dict=train_feed_dict,
                               options=prf_options, run_metadata=prf_run_metadata)
+            
+            #test block
+            grads=self.grads_and_vars[0]
+            print(grads)
+            res=run_sess(self.sess, [grads], feed_dict=train_feed_dict,
+                              options=prf_options, run_metadata=prf_run_metadata)
+            print(res[0][0][0][0])
+            #test block
+ 
             if self.timing_in_training: toc = time.time()
             if self.timing_in_training: train_time += toc - tic
             cur_batch = run_sess(self.sess, self.global_step)

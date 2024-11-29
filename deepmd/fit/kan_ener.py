@@ -301,6 +301,8 @@ class KanEnerFitting (Fitting):
             ext_aparam = tf.cast(ext_aparam,self.fitting_precision)
             layer = tf.concat([layer, ext_aparam], axis = 1)
 
+
+        params={k:v for k,v in self.kan_param_dict.items() if k not in ['base_trainable','bias_trainable']}
         for ii in range(0,len(self.n_neuron)):
             #hidden kan layer
             layer = one_kan_layer(
@@ -313,7 +315,10 @@ class KanEnerFitting (Fitting):
                 mixed_prec = self.mixed_prec,
                 final_layer = False,
                 bavg=0.0,
-                **self.kan_param_dict
+                bias_trainable=self.kan_param_dict['bias_trainable'][ii],
+                base_trainable=self.kan_param_dict['base_trainable'][ii],
+
+                **params
                 )
         #final kan layer
         final_layer = one_kan_layer(
@@ -326,7 +331,9 @@ class KanEnerFitting (Fitting):
             mixed_prec = self.mixed_prec,
             final_layer = True,
             bavg=bias_atom_e,
-            **self.kan_param_dict            
+            bias_trainable=self.kan_param_dict['bias_trainable'][ii],
+            base_trainable=self.kan_param_dict['base_trainable'][ii],
+            **params
             )
 
         return final_layer

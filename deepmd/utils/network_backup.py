@@ -17,8 +17,6 @@ def one_kan_layer(inputs,
                   mixed_prec = None,
                   final_layer = False,
                   bavg=0.0,
-                  bias_trainable=True,
-                  base_trainable=True,
 
                   base_function='b_spline',
                   k=3,
@@ -27,8 +25,10 @@ def one_kan_layer(inputs,
                   noise_scale=0.1,
                   scale_base=1.0,
                   bias_function='silu',
+                  scale_bias_miu=0.0,
                   scale_bias_sigma=1.0,
-                  scale_bias_miu=0.0
+                  bias_trainable=True,
+                  base_trainable=True
                   ):
     # For good accuracy, the last layer of the fitting network uses a higher precision neuron network.
     #bavg: the atomic energy shift
@@ -38,7 +38,13 @@ def one_kan_layer(inputs,
         shape = inputs.get_shape().as_list()
 
         if base_function=='b_spline':
-           
+            #the global grids for one layer, it should be in graph 
+            #shape (in_dim, num+2k+1)
+            delta_l=(grid_range[-1]-grid_range[0])/num
+            grids=tf.linspace(grid_range[0]-k*delta_l,grid_range[-1]+delta_l*k,num+1+2*k)
+            grids=tf.cast(grids,precision)
+            grids=tf.tile(tf.expand_dims(grids,0),[shape[1],1])
+            
             #the initialization of coeff on spline matrix (the base function):
             #[[sp_11,sp_12,...,sp_1m],\
             # [sp_11,sp_12,...,sp_1m],\
@@ -48,44 +54,31 @@ def one_kan_layer(inputs,
             #shape (in_dim,out_dim,num+k or G+k)
             #and other trainable variables
             if initial_variables is not None:
-                grids_ini=tf.constant_initializer(initial_variables[name + '/grids'])
-                coeff_ini=tf.constant_initializer(initial_variables[name + '/coeff'])
-                scale_base_ini=tf.constant_initializer(initial_variables[name+'/scale_base'])
-                scale_bias_ini=tf.constant_initializer(initial_variables[name+'/scale_bias'])
+                coeff_initializer=tf.constant_initializer(initial_variables[name + '/coeff'])
+                scale_base_initializer=tf.constant_initializer(initial_variables[name+'/scale_base'])
+                scale_bias_initializer=tf.constant_initializer(initial_variables[name+'/scale_bias'])
             else:
-                #the global grids for one layer, it should be in graph 
-                #shape (in_dim, num+2k+1)
-                delta_l=(grid_range[-1]-grid_range[0])/num
-                grids_t=tf.linspace(grid_range[0]-k*delta_l,grid_range[-1]+delta_l*k,num+1+2*k)
-                grids_t=tf.cast(grids_t,precision)
-                grids_t=tf.tile(tf.expand_dims(grids_t,0),[shape[1],1])
                 noise=noise_scale*tf.random.uniform([num+1,shape[1],outputs_size],-0.5,0.5,precision)/num
-                coeff_t=curve2coeff(tf.transpose(grids_t)[k:-k,:],noise,grids_t,k)
-                scale_base_t=tf.ones([shape[1],outputs_size],dtype=precision)*scale_base
-                scale_bias_t=scale_bias_sigma*tf.random.uniform([shape[1],outputs_size],-1,1,dtype=precision)/tf.sqrt(tf.constant(shape[1],dtype=precision))+scale_bias_miu/tf.sqrt(tf.constant(shape[1],dtype=precision))
+                coeff_initializer=curve2coeff(tf.transpose(grids)[k:-k,:],noise,grids,k)
+                scale_base_initializer=tf.ones([shape[1],outputs_size],dtype=precision)*scale_base
+                scale_bias_initializer=scale_bias_sigma*tf.random.uniform([shape[1],outputs_size],-1,1,dtype=precision)/tf.sqrt(tf.constant(shape[1],dtype=precision))+\
+                                       scale_bias_miu/tf.sqrt(tf.constant(shape[1],dtype=precision))
 
-                with tf.Session() as sess:
-                    grids_ini=tf.constant_initializer(grids_t.eval())
-                    coeff_ini=tf.constant_initializer(coeff_t.eval())
-                    scale_bias_ini=tf.constant_initializer(scale_bias_t.eval())
-                    scale_base_ini=tf.constant_initializer(scale_base_t.eval())
-
-            grids=tf.get_variable('grids',
-                                  initializer=grids_ini(grids_t.shape,dtype=precision),
-                                  trainable=False)
-            variable_summaries(grids, 'grids')
             coeff=tf.get_variable('coeff',
-                                  initializer=coeff_ini(coeff_t.shape,dtype=precision),
+                                  dtype=precision,
+                                  initializer=coeff_initializer,
                                   trainable=True)
             variable_summaries(coeff, 'coeff')
             scale_base=tf.get_variable('scale_base',
-                                       initializer=scale_base_ini(scale_base_t.shape,dtype=precision),
+                                       dtype=precision,
+                                       initializer=scale_base_initializer,
                                        trainable=base_trainable)
             variable_summaries(scale_base, 'scale_base')
             scale_bias=tf.get_variable('scale_bias',
-                                       initializer=scale_bias_ini(scale_bias_t.shape,dtype=precision),
+                                       dtype=precision,
+                                       initializer=scale_bias_initializer,
                                        trainable=bias_trainable)
-            variable_summaries(scale_bias, 'scale_bias')
+            variable_summaries(scale_base, 'scale_base')
 
             #forward propagation
             if mixed_prec is not None and not final_layer:
@@ -110,7 +103,8 @@ def one_kan_layer(inputs,
             #print('coeff',coeff)
             #print('scale_base',scale_base)
             #print('scale_bias',scale_bias)
-            #print('hidden',hidden+bavg)
+            #print('hidden',hidden)
+
             return hidden+bavg
 
 
@@ -188,8 +182,7 @@ def one_layer(inputs,
                        idt = tf.cast(idt, get_precision(mixed_prec['compute_prec']))
                     return tf.reshape(activation_fn(hidden), [-1, outputs_size]) * idt
                 else :
-                    return tf.reshape(activation_fn(hidden), [-1, outputs_size])
-
+                    return tf.reshape(activation_fn(hidden), [-1, outputs_size])                    
         else:
             if useBN:
                 None
@@ -367,21 +360,3 @@ def variable_summaries(var: tf.Variable, name: str):
         tf.summary.scalar('max', tf.reduce_max(var))
         tf.summary.scalar('min', tf.reduce_min(var))
         tf.summary.histogram('histogram', var)
-
-if __name__=='__main__':
-    in_dim,out_dim=50,1
-    x_input=tf.random.uniform([1,in_dim],-1,1,dtype=GLOBAL_TF_FLOAT_PRECISION)
-    y,coeff=one_kan_layer(x_input,out_dim,bias_trainable=False,base_trainable=False)
-    trainables=tf.trainable_variables()
-    #y,w=one_layer(x_input,out_dim)
-
-    print(trainables)
-    grads=tf.gradients(y,trainables)[0]
-    print(grads)
-    with tf.Session() as sess:
-        init = tf.global_variables_initializer()
-        sess.run(init)
-        print(y.eval())
-        print(grads.eval())
-
-
