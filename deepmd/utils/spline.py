@@ -27,12 +27,12 @@ def B_batch(x,grids,k,epsilon=1e-8):
     #grids: (0, in_dims, G+2k+1)
     grids=tf.expand_dims(grids,axis=0)
     if k==0:
-        #values=tf.cast((x>=grids[:,:,:-1]) & (x<grids[:,:,1:]),GLOBAL_TF_FLOAT_PRECISION)
-        values=tf.where(
-                (x>=grids[:,:,:-1] & x<grids[:,:,1:]),
-                tf.cast(1.0, GLOBAL_TF_FLOAT_PRECISION),
-                tf.cast(0.0, GLOBAL_TF_FLOAT_PRECISION)
-                )
+        values=tf.cast((x>=grids[:,:,:-1]) & (x<grids[:,:,1:]),GLOBAL_TF_FLOAT_PRECISION)
+        #values=tf.where(
+        #        (x>=grids[:,:,:-1] & x<grids[:,:,1:]),
+        #        tf.cast(1.0, GLOBAL_TF_FLOAT_PRECISION),
+        #        tf.cast(0.0, GLOBAL_TF_FLOAT_PRECISION)
+        #        )
 
     else:
         B_kml=B_batch(x[:,:,0],grids[0],k-1)
