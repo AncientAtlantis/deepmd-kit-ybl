@@ -5,7 +5,7 @@ from deepmd.env import GLOBAL_TF_FLOAT_PRECISION
 #import tensorflow.compat.v1 as tf
 #GLOBAL_TF_FLOAT_PRECISION=tf.float64
 
-def B_batch(x,grids,k):
+def B_batch(x,grids,k,epsilon=1e-8):
     """
     it takes a batch of x sample vector, returns the values of b-spline base functions (num=G+k) of order k defined at grids for each x points
     x:
@@ -27,11 +27,16 @@ def B_batch(x,grids,k):
     #grids: (0, in_dims, G+2k+1)
     grids=tf.expand_dims(grids,axis=0)
     if k==0:
-        values=tf.cast((x>=grids[:,:,:-1]) & (x<grids[:,:,1:]),GLOBAL_TF_FLOAT_PRECISION)
+        #values=tf.cast((x>=grids[:,:,:-1]) & (x<grids[:,:,1:]),GLOBAL_TF_FLOAT_PRECISION)
+        values=tf.where(
+                (x>=grids[:,:,:-1] & x<grids[:,:,1:]),
+                tf.cast(1.0, GLOBAL_TF_FLOAT_PRECISION),
+                tf.cast(0.0, GLOBAL_TF_FLOAT_PRECISION)
+                )
+
     else:
         B_kml=B_batch(x[:,:,0],grids[0],k-1)
-        values=B_kml[:,:,:-1]*(x - grids[:,:,:-(k + 1)])/(grids[:,:,k:-1]-grids[:,:,:-(k+1)])+\
-               B_kml[:,:,1:]*(grids[:,:,k+1:]-x)/(grids[:,:,k+1:]-grids[:,:,1:-k])
+        values=B_kml[:,:,:-1]*(x - grids[:,:,:-(k + 1)])/(grids[:,:,k:-1]-grids[:,:,:-(k+1)]+epsilon)+B_kml[:,:,1:]*(grids[:,:,k+1:]-x)/(grids[:,:,k+1:]-grids[:,:,1:-k]+epsilon)
 
     return values
 
