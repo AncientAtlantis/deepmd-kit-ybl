@@ -117,6 +117,50 @@ def coeff2curve(x_inputs,grids,k,coeff):
     return y
 
 
+def rbf_batch(x,grids,h):
+    """
+     it takes a batch of x sample vector, returns the values of rbf base functions for each xi
+     x:
+         2D tensor
+             shape: (batch, in_dim)
+     grids:
+         2D tensor
+             shape: (n_of_bias, in_dim)
+         int
+     return:
+         3D tensor
+             shape: (batch, in_dim, n_of_bias)
+    """
+    #x: (batch, in_dim, 1)
+    x=tf.expand_dims(x,axis=-1)
+    #grids: (1, in_dims, n_of_bias)
+    grids=tf.expand_dims(grids,axis=0)
+    return tf.exp(-(x-girds)**2/2/(h**2))
+
+def rbf_coeff2curve(x_inputs,grids,coeff,h):
+    """
+    it tackes x_inputs and target y_out, return the fitted coeff of base functions
+    the x_inputs specify the x samples for each spline function and each input dimension of the layer
+    x_input:
+        2D tensor
+            shape: (batch, in_dim)
+    grids:
+        2D tensor
+            shape: (in_dim, n_of_bias)
+    coeff:
+        3D tensor
+            shape: (in_dim, out_dim, n_of_bias)
+    return:
+        3D tensor
+            shape (batch, in_dim, out_dim)
+    """
+    #mat: (batch,in_dim,n_of_bias)
+    #coeff: (in_dim,out_dim,n_of_bias)
+    mat=rbf_batch(x_inputs,grids,h)
+    y=tf.einsum('ijk,jlk->ijl',mat,coeff)
+    return y
+
+
 if __name__=='__main__':
     """
     test block
