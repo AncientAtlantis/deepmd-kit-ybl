@@ -3,7 +3,7 @@ import numpy as np
 from deepmd.env import tf
 from deepmd.env import GLOBAL_TF_FLOAT_PRECISION
 from deepmd.common import get_precision
-from deepmd.utils.grid_based import curve2coeff,coeff2curve,rbf_coeff2curve
+from deepmd.utils.grid_based import curve2coeff,coeff2curve,rbf_coeff2curve,relu_coeff2curve
 from deepmd.utils.fourier import f_coeff2curve
 from deepmd.utils.chebyshev import cheb1_coeff2curve, cheb2_coeff2curve
 
@@ -48,7 +48,7 @@ def one_kan_layer(inputs,
         with tf.Session() as sess:
             scale_bias_ini=tf.constant_initializer(scale_bias_t.eval())
             scale_base_ini=tf.constant_initializer(scale_base_t.eval())
-        #the grid based base function
+        #the grid based base function (fixed grids)
         if base_function in ['b_spline','rbf']:
             #map inputs into grid_range 
             g_low,g_high=grid_range
@@ -65,11 +65,11 @@ def one_kan_layer(inputs,
                 grids_t=tf.cast(grids_t,precision)
                 grids_t=tf.tile(tf.expand_dims(grids_t,0),[shape[1],1])
                 noise=noise_scale*tf.random.uniform([num+1,shape[1],outputs_size],-0.5,0.5,precision)/num
-                #noise: (n_of_base_func, in_dims, out_dim)
+                #noise: (n_grids_points, in_dims, out_dim)
                 if base_function=='b_spline':
                     coeff_t=curve2coeff(tf.transpose(grids_t)[k:-k,:],noise,grids_t,k)
                 elif base_function=='rbf':
-                    coeff_t=tf.identity(noise)
+                    coeff_t=noise_scale*tf.random.uniform([num+1+k,shape[1],outputs_size],-0.5,0.5,precision)/num
                 else:
                     pass
                 with tf.Session() as sess:
@@ -105,6 +105,68 @@ def one_kan_layer(inputs,
                 hidden_base=rbf_coeff2curve(inputs,grids,coeff,delta_l)*scale_base
             else:
                 pass
+            if bias_function=='silu':
+                hidden_bias=tf.tile(tf.expand_dims(inputs,axis=-1),[1,1,outputs_size])
+                hidden_bias=tf.nn.silu(hidden_base)*scale_bias
+            hidden=tf.reduce_sum(hidden_base+hidden_bias,axis=-2)
+
+            return hidden+bavg
+        #the grid based base function (trainable grids)
+        elif base_function in ['RELU','HRELU']:
+            #map inputs into grid_range 
+            g_low,g_high=grid_range
+            inputs=0.5*(g_high-g_low)*tf.tanh(inputs)+0.5*(g_low+g_high)
+            #initialization of grids and coeff
+            delta_l=(grid_range[-1]-grid_range[0])/num
+            if initial_variables is not None:
+                grids_s_ini=tf.constant_initializer(initial_variables[name + '/grids_s'])
+                grids_e_ini=tf.constant_initializer(initial_variables[name + '/grids_e'])
+                coeff_ini=tf.constant_initializer(initial_variables[name + '/coeff'])
+            else:
+                #the global grids for each layer
+                #shape (in_dim, num+2k+1)
+                grids_s_t=tf.linspace(grid_range[0]-k*delta_l,grid_range[-1]-delta_l,num+k)
+                grids_e_t=tf.linspace(grid_range[0]+delta_l,grid_range[-1]+delta_l*k,num+k)
+                grids_s_t=tf.cast(grids_s_t,precision)
+                grids_e_t=tf.cast(grids_e_t,precision)
+                grids_s_t=tf.tile(tf.expand_dims(grids_s_t,0),[shape[1],1])
+                grids_e_t=tf.tile(tf.expand_dims(grids_e_t,0),[shape[1],1])
+                coeff_t=noise_scale*tf.random.uniform([num+k,shape[1],outputs_size],-0.5,0.5,precision)/num
+                #coeff: (n_of_base_func or num+k, in_dims, out_dim)
+                with tf.Session() as sess:
+                    grids_s_ini=tf.constant_initializer(grids_s_t.eval())
+                    grids_e_ini=tf.constant_initializer(grids_e_t.eval())
+                    coeff_ini=tf.constant_initializer(coeff_t.eval())
+            #create trainable variables
+            grids_s=tf.get_variable('grids_s',
+                                  initializer=grids_s_ini(grids_s_t.shape,dtype=precision),
+                                  trainable=True)
+            variable_summaries(grids, 'grids_s')
+            grids_e=tf.get_variable('grids_e',
+                                  initializer=grids_e_ini(grids_e_t.shape,dtype=precision),
+                                  trainable=True)
+            variable_summaries(grids, 'grids_e')
+            coeff=tf.get_variable('coeff',
+                                  initializer=coeff_ini(coeff_t.shape,dtype=precision),
+                                  trainable=True)
+            variable_summaries(coeff, 'coeff')
+            scale_base=tf.get_variable('scale_base',
+                                       initializer=scale_base_ini(scale_base_t.shape,dtype=precision),
+                                       trainable=base_trainable)
+            variable_summaries(scale_base, 'scale_base')
+            scale_bias=tf.get_variable('scale_bias',
+                                       initializer=scale_bias_ini(scale_bias_t.shape,dtype=precision),
+                                       trainable=bias_trainable)
+            variable_summaries(scale_bias, 'scale_bias')
+            #forward propagation
+            if mixed_prec is not None and not final_layer:
+                inputs=tf.cast(inputs,get_precision(mixed_prec['compute_prec']))
+                grids_s=tf.cast(grids_s,get_precision(mixed_prec['compute_prec']))
+                grids_e=tf.cast(grids_e,get_precision(mixed_prec['compute_prec']))
+                coeff=tf.cast(coeff,get_precision(mixed_prec['compute_prec']))
+                scale_bias=tf.cast(scale_bias,get_precision(mixed_prec['compute_prec']))
+                scale_base=tf.cast(scale_base,get_precision(mixed_prec['compute_prec']))
+            hidden_base=relu_coeff2curve(inputs,grids_s,grids_e,coeff,delta*k)*scale_base
             if bias_function=='silu':
                 hidden_bias=tf.tile(tf.expand_dims(inputs,axis=-1),[1,1,outputs_size])
                 hidden_bias=tf.nn.silu(hidden_base)*scale_bias
