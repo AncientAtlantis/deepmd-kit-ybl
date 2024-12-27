@@ -1,9 +1,5 @@
-
 from deepmd.env import tf
 from deepmd.env import GLOBAL_TF_FLOAT_PRECISION
-
-#import tensorflow.compat.v1 as tf
-#GLOBAL_TF_FLOAT_PRECISION=tf.float64
 
 def B_batch(x,grids,k,epsilon=1e-8):
     """
@@ -160,7 +156,7 @@ def rbf_coeff2curve(x_inputs,grids,coeff,h):
     y=tf.einsum('ijk,jlk->ijl',mat,coeff)
     return y
 
-def relu_batch(x,grids_s,grids_e,interval):
+def relu_batch(x,grids_s,grids_e,interval,degree):
     """
      it takes a batch of x sample vector, returns the values of rbf base functions for each xi
      x:
@@ -171,6 +167,8 @@ def relu_batch(x,grids_s,grids_e,interval):
              shape: (n_of_bias, in_dim)
      interval: 
          float
+     degree:
+         int
      return:
          3D tensor
              shape: (batch, in_dim, n_of_bias)
@@ -179,9 +177,9 @@ def relu_batch(x,grids_s,grids_e,interval):
     x=tf.expand_dims(x,axis=-1)
     #grids_s, grids_e: (1, in_dims, n_of_bias)
     grids_s,girds_e=tf.expand_dims(grids_s,axis=0),tf.expand_dims(grids_e,axis=0)
-    return tf.squre(tf.nn.relu(x-grids_s)*tf.nn.relu(grids_e-x))*16/interval**4
+    return tf.pow(tf.nn.relu(x-grids_s)*tf.nn.relu(grids_e-x),degree)*tf.pow(2/interval,2*degree)
 
-def relu_coeff2curve(x_inputs,grids_s,grids_e,coeff,interval):
+def relu_coeff2curve(x_inputs,grids_s,grids_e,coeff,interval,degree):
     """
     it tackes x_inputs and target y_out, return the fitted coeff of base functions
     the x_inputs specify the x samples for each spline function and each input dimension of the layer
@@ -194,13 +192,15 @@ def relu_coeff2curve(x_inputs,grids_s,grids_e,coeff,interval):
     coeff:
         3D tensor
             shape: (in_dim, out_dim, n_of_bias)
+    degree:
+        int
     return:
         3D tensor
             shape (batch, in_dim, out_dim)
     """
     #x: (batch, in_dim, 1)
     #mat: (batch, in_dim, n_of_bias)
-    mat=rbf_batch(x_inputs,grids_s,grids_e,interval)
+    mat=rbf_batch(x_inputs,grids_s,grids_e,interval,degree)
     y=tf.einsum('ijk,jlk->ijl',mat,coeff)
     return y
 
