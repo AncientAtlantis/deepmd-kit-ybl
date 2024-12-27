@@ -108,7 +108,7 @@ def one_kan_layer(inputs,
             else:
                 pass
         #the grid based base function (trainable grids)
-        elif base_function in ['RELU']:
+        elif base_function in ['relu']:
             #the new input parameter degree is needed
             #map inputs into grid_range 
             g_low,g_high=grid_range
@@ -244,9 +244,9 @@ def one_kan_layer(inputs,
                 if 'wav' in base_function:
                     coeff2_ini=tf.constant_initializer(initial_variables[name + '/coeff2'])
             else:
-                coeff_t=noise_scale*tf.random.uniform([shape[1],outputs_size],-0.5,0.5,precision)/num #degree+1=num
+                coeff_t=noise_scale*tf.random.uniform([shape[1],outputs_size],-0.5,0.5,precision)/num 
                 if 'wav' in base_function:
-                    coeff2_t=noise_scale*tf.random.uniform([shape[1],outputs_size],0.5,1,precision)/num #degree+1=num
+                    coeff2_t=noise_scale*tf.random.uniform([shape[1],outputs_size],0.5,1,precision)/num 
                 with tf.Session() as sess:
                     coeff_ini=tf.constant_initializer(coeff_t.eval())
                     if 'wav' in base_function:

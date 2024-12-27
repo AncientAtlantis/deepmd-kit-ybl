@@ -17,7 +17,7 @@ def F_batch(x,num):
     #x: (batch, in_dim, 1)
     x=tf.expand_dims(x,axis=-1)
     #k: (1, 1, num)
-    k=tf.expand_dims(tf.range(1,num+1,dtype=GLOBAL_TF_PRECISION),[0,1])
+    k=tf.expand_dims(tf.range(0,num,dtype=GLOBAL_TF_PRECISION),[0,1])
     return tf.cos(k*x),tf.sin(k*x)
 
 def f_coeff2curve(x_inputs,coeff_alpha,coeff_beta):
