@@ -18,7 +18,9 @@ def C_batch(x,num,t):
     #x: (batch, in_dim, 1)
     x=tf.expand_dims(x,axis=-1)
     #degrees: (1, 1, num)
-    degrees=tf.expand_dims(tf.range(0,num,dtype=GLOBAL_TF_PRECISION),[0,1])
+    degrees=tf.expand_dims(tf.range(0,num,dtype=GLOBAL_TF_FLOAT_PRECISION),axis=0)
+    degrees=tf.expand_dims(degrees,axis=0)
+    #print(degrees)
     if t==1:
         values=tf.cos(tf.acos(x)*degrees)
     else:
@@ -38,7 +40,7 @@ def cheb1_coeff2curve(x_inputs,coeff):
             shape (batch, in_dim, out_dim)
     """
     #num: degree+1, or number of bias
-    num=tf.shape(coeff_alpha)[-1]
+    num=tf.shape(coeff)[-1]
     #mat: (batch,in_dim,num)
     mat=C_batch(x_inputs,num,1)
     #y: (batch, in_dim, out_dim)
@@ -58,7 +60,7 @@ def cheb2_coeff2curve(x_inputs,coeff):
             shape (batch, in_dim, out_dim)
     """
     #num: degree+1, or number of bias
-    num=tf.shape(coeff_alpha)[-1]
+    num=tf.shape(coeff)[-1]
     #mat: (batch,in_dim,num)
     mat=C_batch(x_inputs,num,2)
     #y: (batch, in_dim, out_dim)

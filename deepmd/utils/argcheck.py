@@ -296,6 +296,7 @@ def fitting_ener_kan():
     doc_scale_bias_sigma = 'The initialization factor of bias function'
     doc_bias_trainable = 'Specify the trainable of bias function'
     doc_base_trainable = 'The base functioin trainable'
+    doc_degree = 'The degree of relu'
 
     return [
         Argument("numb_fparam", int, optional = True, default = 0, doc = doc_numb_fparam),
@@ -314,7 +315,8 @@ def fitting_ener_kan():
         Argument("scale_bias_miu", float, optional = True, default = 0.0, doc = doc_scale_bias_miu),
         Argument("scale_bias_sigma", float, optional = True, default = 1.0, doc = doc_scale_bias_sigma),
         Argument("bias_trainable", bool, optional = True, default = True, doc = doc_bias_trainable),
-        Argument("base_trainable", bool, optional = True, default = True, doc = doc_base_trainable)
+        Argument("base_trainable", bool, optional = True, default = True, doc = doc_base_trainable),
+        Argument("degree", int, optional = True, default = True, doc = doc_degree)
     ]
 
 

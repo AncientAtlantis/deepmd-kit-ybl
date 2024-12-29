@@ -91,7 +91,8 @@ class KanEnerFitting (Fitting):
                   scale_bias_miu : float=0.0,
                   scale_bias_sigma : float=1.0,
                   bias_trainable : bool=True,
-                  base_trainable : bool=True
+                  base_trainable : bool=True,
+                  degree: int=2
     ) -> None:
         """
         Constructor
@@ -149,7 +150,8 @@ class KanEnerFitting (Fitting):
         # set parameters for KAN network
         self.kan_param_dict={}
         self.kan_param_dict['base_function']=base_function
-        if self.kan_param_dict['base_function']=='b_spline':
+        #if self.kan_param_dict['base_function']=='b_spline':
+        if True:
             self.kan_param_dict['k']=k
             self.kan_param_dict['grid_range']=grid_range
             self.kan_param_dict['num']=num
@@ -160,6 +162,7 @@ class KanEnerFitting (Fitting):
             self.kan_param_dict['scale_bias_sigma']=scale_bias_sigma
             self.kan_param_dict['bias_trainable']=bias_trainable 
             self.kan_param_dict['base_trainable']=base_trainable
+            self.kan_param_dict['degree']=degree
             if self.kan_param_dict['bias_trainable'] is None:
                 self.kan_param_dict['bias_trainable'] = [True for ii in range(len(self.n_neuron) + 1)]
             if type(self.kan_param_dict['bias_trainable']) is bool:

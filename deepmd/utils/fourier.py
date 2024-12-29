@@ -17,7 +17,10 @@ def F_batch(x,num):
     #x: (batch, in_dim, 1)
     x=tf.expand_dims(x,axis=-1)
     #k: (1, 1, num)
-    k=tf.expand_dims(tf.range(0,num,dtype=GLOBAL_TF_PRECISION),[0,1])
+    k=tf.expand_dims(tf.range(0,num),axis=0)
+    #print(k)
+    k=tf.expand_dims(k,axis=0)
+    k=tf.cast(k,GLOBAL_TF_FLOAT_PRECISION)
     return tf.cos(k*x),tf.sin(k*x)
 
 def f_coeff2curve(x_inputs,coeff_alpha,coeff_beta):
@@ -36,5 +39,6 @@ def f_coeff2curve(x_inputs,coeff_alpha,coeff_beta):
     #cos, sin: (batch,in_sim,num)
     cos,sin=F_batch(x_inputs,num)
     y=tf.einsum('ijk,jlk->ijl',cos,coeff_alpha)+tf.einsum('ijk,jlk->ijl',sin,coeff_beta)
+    #print(y)
     return y
 

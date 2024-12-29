@@ -121,7 +121,7 @@ def rbf_batch(x,grids,h):
              shape: (batch, in_dim)
      grids:
          2D tensor
-             shape: (n_of_bias, in_dim)
+             shape: (in_dim, n_of_bias)
          int
      return:
          3D tensor
@@ -131,7 +131,7 @@ def rbf_batch(x,grids,h):
     x=tf.expand_dims(x,axis=-1)
     #grids: (1, in_dims, n_of_bias)
     grids=tf.expand_dims(grids,axis=0)
-    return tf.exp(-(x-girds)**2/2/(h**2))
+    return tf.exp(-(x-grids)**2/2/(h**2))
 
 def rbf_coeff2curve(x_inputs,grids,coeff,h):
     """
@@ -164,7 +164,7 @@ def relu_batch(x,grids_s,grids_e,interval,degree):
              shape: (batch, in_dim)
      grids_s,grids_e:
          2D tensor
-             shape: (n_of_bias, in_dim)
+             shape: (in_dim, n_of_bias)
      interval: 
          float
      degree:
@@ -177,7 +177,7 @@ def relu_batch(x,grids_s,grids_e,interval,degree):
     x=tf.expand_dims(x,axis=-1)
     #grids_s, grids_e: (1, in_dims, n_of_bias)
     grids_s,girds_e=tf.expand_dims(grids_s,axis=0),tf.expand_dims(grids_e,axis=0)
-    return tf.pow(tf.nn.relu(x-grids_s)*tf.nn.relu(grids_e-x),degree)*tf.pow(2/interval,2*degree)
+    return tf.pow(tf.nn.relu(x-grids_s)*tf.nn.relu(grids_e-x),degree)*tf.cast(tf.pow(2/interval,2*degree),GLOBAL_TF_FLOAT_PRECISION)
 
 def relu_coeff2curve(x_inputs,grids_s,grids_e,coeff,interval,degree):
     """
@@ -200,7 +200,7 @@ def relu_coeff2curve(x_inputs,grids_s,grids_e,coeff,interval,degree):
     """
     #x: (batch, in_dim, 1)
     #mat: (batch, in_dim, n_of_bias)
-    mat=rbf_batch(x_inputs,grids_s,grids_e,interval,degree)
+    mat=relu_batch(x_inputs,grids_s,grids_e,interval,degree)
     y=tf.einsum('ijk,jlk->ijl',mat,coeff)
     return y
 

@@ -71,7 +71,7 @@ def one_kan_layer(inputs,
                     noise=noise_scale*tf.random.uniform([num+1,shape[1],outputs_size],-0.5,0.5,precision)/num
                     coeff_t=curve2coeff(tf.transpose(grids_t)[k:-k,:],noise,grids_t,k)
                 elif base_function=='rbf':
-                    coeff_t=noise_scale*tf.random.uniform([num+1+2*k,shape[1],outputs_size],-0.5,0.5,precision)/num
+                    coeff_t=noise_scale*tf.random.uniform([shape[1],outputs_size,num+1+2*k],-0.5,0.5,precision)/num
                 else:
                     pass
                 with tf.Session() as sess:
@@ -101,7 +101,7 @@ def one_kan_layer(inputs,
                 coeff=tf.cast(coeff,get_precision(mixed_prec['compute_prec']))
                 scale_bias=tf.cast(scale_bias,get_precision(mixed_prec['compute_prec']))
                 scale_base=tf.cast(scale_base,get_precision(mixed_prec['compute_prec']))
-            if base_functioin=='b_spline':
+            if base_function=='b_spline':
                 hidden_base=coeff2curve(inputs,grids,k,coeff)*scale_base
             elif base_function=='rbf':
                 hidden_base=rbf_coeff2curve(inputs,grids,coeff,delta_l)*scale_base
@@ -128,7 +128,7 @@ def one_kan_layer(inputs,
                 grids_e_t=tf.cast(grids_e_t,precision)
                 grids_s_t=tf.tile(tf.expand_dims(grids_s_t,0),[shape[1],1])
                 grids_e_t=tf.tile(tf.expand_dims(grids_e_t,0),[shape[1],1])
-                coeff_t=noise_scale*tf.random.uniform([num+k,shape[1],outputs_size],-0.5,0.5,precision)/num
+                coeff_t=noise_scale*tf.random.uniform([shape[1],outputs_size,num+k],-0.5,0.5,precision)/num
                 #coeff: (n_of_base_func or num+k, in_dims, out_dim)
                 with tf.Session() as sess:
                     grids_s_ini=tf.constant_initializer(grids_s_t.eval())
@@ -138,11 +138,11 @@ def one_kan_layer(inputs,
             grids_s=tf.get_variable('grids_s',
                                   initializer=grids_s_ini(grids_s_t.shape,dtype=precision),
                                   trainable=True)
-            variable_summaries(grids, 'grids_s')
+            variable_summaries(grids_s, 'grids_s')
             grids_e=tf.get_variable('grids_e',
                                   initializer=grids_e_ini(grids_e_t.shape,dtype=precision),
                                   trainable=True)
-            variable_summaries(grids, 'grids_e')
+            variable_summaries(grids_e, 'grids_e')
             coeff=tf.get_variable('coeff',
                                   initializer=coeff_ini(coeff_t.shape,dtype=precision),
                                   trainable=True)
@@ -163,10 +163,10 @@ def one_kan_layer(inputs,
                 coeff=tf.cast(coeff,get_precision(mixed_prec['compute_prec']))
                 scale_bias=tf.cast(scale_bias,get_precision(mixed_prec['compute_prec']))
                 scale_base=tf.cast(scale_base,get_precision(mixed_prec['compute_prec']))
-            hidden_base=relu_coeff2curve(inputs,grids_s,grids_e,coeff,delta*k,degree)*scale_base
+            hidden_base=relu_coeff2curve(inputs,grids_s,grids_e,coeff,delta_l*k,degree)*scale_base
         elif base_function=='fourier':
             #map inputs into [-pi, pi]
-            inputs=tf.constant(3.1415926535)*tf.tanh(inputs)
+            inputs=tf.constant(3.1415926535,dtype=precision)*tf.tanh(inputs)
             #create variable initializer
             if initial_variables is not None:
                 coeff_alpha_ini=tf.constant_initializer(initial_variables[name + '/coeff_alpha'])
@@ -181,11 +181,11 @@ def one_kan_layer(inputs,
             coeff_alpha=tf.get_variable('coeff_alpha',
                                         initializer=coeff_alpha_ini(coeff_alpha_t.shape,dtype=precision),
                                         trainable=True)
-            variable_summaries(coeff, 'coeff_alpha')
+            variable_summaries(coeff_alpha, 'coeff_alpha')
             coeff_beta=tf.get_variable('coeff_beta',
                                         initializer=coeff_beta_ini(coeff_beta_t.shape,dtype=precision),
                                         trainable=True)
-            variable_summaries(coeff, 'coeff_beta')
+            variable_summaries(coeff_beta, 'coeff_beta')
             scale_base=tf.get_variable('scale_base',
                                        initializer=scale_base_ini(scale_base_t.shape,dtype=precision),
                                        trainable=base_trainable)
@@ -280,27 +280,27 @@ def one_kan_layer(inputs,
             coeff=tf.expand_dims(coeff,axis=0)#(1,in_dim,out_dim)
             if 'wav' in base_function:
                 coeff2=tf.expand_dims(coeff2,axis=0)#(1,in_dim,out_dim)
-            inputs=tf.expand_dims(inputs,axis=-1)#(batch,in_dim,1)
+            xs=tf.expand_dims(inputs,axis=-1)#(batch,in_dim,1)
             if base_function=='skan-soft':
-                hidden_base=tf.log(tf.exp(coeff*inputs))-tf.log(2) #(batch,in_dim,out_dim)
+                hidden_base=tf.log(tf.exp(coeff*xs))-tf.cast(tf.log(2.0),precision) #(batch,in_dim,out_dim)
             elif base_function=='skan-lsin':
-                hidden_base=coeff*tf.sin(inputs)
+                hidden_base=coeff*tf.sin(xs)
             elif base_function=='skan-lcos':
-                hidden_base=coeff*tf.cos(inputs)
+                hidden_base=coeff*tf.cos(xs)
             elif base_function=='skan-larctan':
-                hidden_base=tf.atan(coeff*inputs)
+                hidden_base=tf.atan(coeff*xs)
             elif base_function=='wav-mexican':
-                t=(inputs-coeff)/coeff2
-                hidden_base=2.0*(tf.squre(t)-1.0)*tf.exp(-tf.squre(t)/2.0)/tf.sqrt(3.0)*tf.pow(3.14159,0.25)
+                t=(xs-coeff)/coeff2
+                hidden_base=tf.cast(2.0,precision)*(tf.square(t)-tf.cast(1.0,precision))*tf.exp(-tf.square(t)/tf.cast(2.0,precision))/tf.cast(tf.sqrt(3.0),precision)*tf.cast(tf.pow(3.14159,0.25),precision)
             elif base_function=='wav-morlet':
-                t=(inputs-coeff)/coeff2
-                hidden_base=tf.cos(5.0*t)*tf.exp(-tf.squre(t)/2.0)
+                t=(xs-coeff)/coeff2
+                hidden_base=tf.cast(tf.cos(tf.cast(5.0,precision)*t)*tf.exp(-tf.square(t)/tf.cast(2.0,precision)),precision)
             elif base_function=='wav-dog':
-                t=(inputs-coeff)/coeff2
-                hidden_base=t*tf.exp(-tf.squre(t)/2.0)
+                t=(xs-coeff)/coeff2
+                hidden_base=tf.cast(t*tf.exp(-tf.square(t)/2.0),precision)
             elif base_function=='wav-shannon':
-                t=(inputs-coeff)/coeff2
-                tf.experimental.numpy.sinc(t/3.1415926)*tf.exp(-tf.squre(t)/2)
+                t=(xs-coeff)/coeff2
+                tf.cast(tf.experimental.numpy.sinc(t/tf.cast(3.1415926,precision))*tf.exp(-tf.squre(t)/tf.cast(2.0,precision)),precision)
             else:
                 pass
             #hidden_base: (batch, in, out)
