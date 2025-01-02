@@ -217,10 +217,10 @@ def one_kan_layer(inputs,
             #hidden_base: (batch, in, out)
             hidden_base=tf.gather_nd(coeff,indices_l)
             if degree>0:
-                scale=tf.squeeze(scale)
+                scales=tf.squeeze(scales)
                 indices_h=tf.concat([mesh,seg_idx_h],axis=-1)
                 sel_hidden_h=tf.gether_nd(coeff,indices_h)
-                hidden_base*(tf.cast(1.0,scale.dtype)-scales)+sel_hidden_h*scale
+                hidden_base=hidden_base*(tf.cast(1.0,scales.dtype)-scales)+sel_hidden_h*scales
         elif base_function=='fourier':
             #map inputs into [-pi, pi]
             inputs=tf.constant(3.1415926535,dtype=precision)*tf.tanh(inputs)
