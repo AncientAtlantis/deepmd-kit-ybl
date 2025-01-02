@@ -180,7 +180,7 @@ def one_kan_layer(inputs,
             coeff=tf.get_variable('coeff',
                                    initializer=coeff_ini(coeff_t.shape,dtype=precision),
                                    trainable=True)
-            variable_summaries(coeff_alpha, 'coeff')
+            variable_summaries(coeff, 'coeff')
             scale_base=tf.get_variable('scale_base',
                                        initializer=scale_base_ini(scale_base_t.shape,dtype=precision),
                                        trainable=base_trainable)
@@ -200,7 +200,7 @@ def one_kan_layer(inputs,
             xs=tf.tile(tf.expand_dims(inputs,axis=-1),[1,1,outputs_size])-tf.cast(-1.0,inputs.dtype)
             #seg_idx_l, seg_idx_h: (batch, in, out, 1)
             seg_idx_l=tf.expand_dims(tf.cast(tf.math.floordiv(xs,delta_l),tf.int32),axis=-1)
-            seg_idx_h=seg_inx_l+tf.cast(1,tf.int32)
+            seg_idx_h=seg_idx_l+tf.cast(1,tf.int32)
             #scales: (batch, in, out, 1)
             scales=tf.expand_dims(tf.math.floormod(xs,delta_l),axis=-1)
             #zeros: (batch, in, out, 1)
