@@ -164,6 +164,63 @@ def one_kan_layer(inputs,
                 scale_bias=tf.cast(scale_bias,get_precision(mixed_prec['compute_prec']))
                 scale_base=tf.cast(scale_base,get_precision(mixed_prec['compute_prec']))
             hidden_base=relu_coeff2curve(inputs,grids_s,grids_e,coeff,delta_l*k,degree)*scale_base
+        elif base_function in ['segment']:
+            #map inputs into (-1, 1)
+            inputs=tf.tanh(inputs)
+            #create variable initializer
+            if initial_variables is not None:
+                coeff_ini=tf.constant_initializer(initial_variables[name + '/coeff'])
+            else:
+                coeff_t=noise_scale*tf.random.uniform([shape[1],outputs_size,num+1],-0.5,0.5,precision)/num
+                with tf.Session() as sess:
+                    coeff_ini=tf.constant_initializer(coeff_t.eval())
+
+            #create trainable variables
+            #coeff: (in, out, num+1)
+            coeff=tf.get_variable('coeff',
+                                   initializer=coeff_ini(coeff_t.shape,dtype=precision),
+                                   trainable=True)
+            variable_summaries(coeff_alpha, 'coeff')
+            scale_base=tf.get_variable('scale_base',
+                                       initializer=scale_base_ini(scale_base_t.shape,dtype=precision),
+                                       trainable=base_trainable)
+            variable_summaries(scale_base, 'scale_base')
+            scale_bias=tf.get_variable('scale_bias',
+                                       initializer=scale_bias_ini(scale_bias_t.shape,dtype=precision),
+                                       trainable=bias_trainable)
+            variable_summaries(scale_bias, 'scale_bias')
+            #forward propagation
+            if mixed_prec is not None and not final_layer:
+                inputs=tf.cast(inputs,get_precision(mixed_prec['compute_prec']))
+                coeff=tf.cast(coeff,get_precision(mixed_prec['compute_prec']))
+                scale_bias=tf.cast(scale_bias,get_precision(mixed_prec['compute_prec']))
+                scale_base=tf.cast(scale_base,get_precision(mixed_prec['compute_prec']))
+            delta_l=tf.cast(2.0,inputs.dtype)/tf.cast(num,inputs.dtype)
+            #xs: (batch, in, out)
+            xs=tf.tile(tf.expand_dims(inputs,axis=-1),[1,1,outputs_size])-tf.cast(-1.0,inputs.dtype)
+            #seg_idx_l, seg_idx_h: (batch, in, out, 1)
+            seg_idx_l=tf.expand_dims(tf.cast(tf.math.floordiv(xs,delta_l),tf.int32),axis=-1)
+            seg_idx_h=seg_inx_l+tf.cast(1,tf.int32)
+            #scales: (batch, in, out, 1)
+            scales=tf.expand_dims(tf.math.floormod(xs,delta_l),axis=-1)
+            #zeros: (batch, in, out, 1)
+            zeros=tf.zeros_like(scales,dtype=seg_idx_l.dtype)
+            outs,ins=tf.range(0,outputs_size),tf.range(0,shape[1])
+            #OUT, IN: (in, out)
+            OUT,IN=tf.meshgrid(outs,ins)
+            #mesh: (1, in, out, 2)
+            mesh=tf.cast(tf.expand_dims(tf.stack([IN,OUT],axis=-1),axis=0),seg_idx_l.dtype)
+            #mesh: (batch, in, out, 2)
+            mesh=mesh+zeros
+            #indices_l: (batch, in, out, 3)
+            indices_l=tf.concat([mesh,seg_idx_l],axis=-1)
+            #hidden_base: (batch, in, out)
+            hidden_base=tf.gather_nd(coeff,indices_l)
+            if degree>0:
+                scale=tf.squeeze(scale)
+                indices_h=tf.concat([mesh,seg_idx_h],axis=-1)
+                sel_hidden_h=tf.gether_nd(coeff,indices_h)
+                hidden_base*(tf.cast(1.0,scale.dtype)-scales)+sel_hidden_h*scale
         elif base_function=='fourier':
             #map inputs into [-pi, pi]
             inputs=tf.constant(3.1415926535,dtype=precision)*tf.tanh(inputs)
@@ -238,7 +295,6 @@ def one_kan_layer(inputs,
                 hidden_base=cheb2_coeff2curve(inputs,coeff)*scale_base
         elif base_function in ['skan-soft','skan-lsin','skan-lcos','skan-larctan','wav-mexican','wav-morlet','wav-dog','wav-shannon']:
             #create variable initializer
-            #the num parameter is the degree of chebyshev polynomial
             if initial_variables is not None:
                 coeff_ini=tf.constant_initializer(initial_variables[name + '/coeff'])
                 if 'wav' in base_function:
