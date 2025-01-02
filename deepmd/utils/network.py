@@ -221,6 +221,8 @@ def one_kan_layer(inputs,
                 indices_h=tf.concat([mesh,seg_idx_h],axis=-1)
                 sel_hidden_h=tf.gether_nd(coeff,indices_h)
                 hidden_base=hidden_base*(tf.cast(1.0,scales.dtype)-scales)+sel_hidden_h*scales
+            hidden_base=tf.einsum('ijk,ij->ijk',hidden_base,inputs)
+
         elif base_function=='fourier':
             #map inputs into [-pi, pi]
             inputs=tf.constant(3.1415926535,dtype=precision)*tf.tanh(inputs)
