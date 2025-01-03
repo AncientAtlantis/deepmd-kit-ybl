@@ -166,7 +166,9 @@ def one_kan_layer(inputs,
             hidden_base=relu_coeff2curve(inputs,grids_s,grids_e,coeff,delta_l*k,degree)*scale_base
         elif base_function in ['segment']:
             #map inputs into (-1, 1)
-            inputs=tf.tanh(inputs)
+            mean=tf.math.reduce_mean(inputs,axis=-1,keepdims=True)
+            std=tf.math.reduce_std(inputs,axis=-1,keepdims=True)
+            inputs=tf.tanh(tf.cast(100.0,precision)*(inputs-mean)/std)
             #create variable initializer
             if initial_variables is not None:
                 coeff_ini=tf.constant_initializer(initial_variables[name + '/coeff'])
