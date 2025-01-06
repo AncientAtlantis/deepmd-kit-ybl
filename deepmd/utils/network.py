@@ -197,8 +197,6 @@ def one_kan_layer(inputs,
                 inputs=tf.cast(inputs,get_precision(mixed_prec['compute_prec']))
                 coeff=tf.cast(coeff,get_precision(mixed_prec['compute_prec']))
                 b=tf.cast(b,get_precision(mixed_prec['compute_prec']))
-                scale_bias=tf.cast(scale_bias,get_precision(mixed_prec['compute_prec']))
-                scale_base=tf.cast(scale_base,get_precision(mixed_prec['compute_prec']))
             delta_l=tf.cast(2.0,inputs.dtype)/tf.cast(num,inputs.dtype)
             #xs: (batch, in, out)
             xs=tf.tile(tf.expand_dims(inputs,axis=-1),[1,1,outputs_size])-tf.cast(-1.0,inputs.dtype)
@@ -240,7 +238,8 @@ def one_kan_layer(inputs,
                 w_ini=tf.constant_initializer(initial_variables[name+'/weight'])
             else:
                 coeff_t=noise_scale*tf.random.uniform([shape[1],outputs_size,num+1],-0.5,0.5,precision)/num
-                w_t=tf.ones([shape[1]],dtype=precision)/tf.cast(tf.sqrt(shape[1]),precision)
+                #w_t=tf.ones([shape[1]],dtype=precision)/tf.sqrt(tf.cast(shape[1],precision))
+                w_t=tf.ones([shape[1]],dtype=precision)
                 with tf.Session() as sess:
                     coeff_ini=tf.constant_initializer(coeff_t.eval())
                     w_ini=tf.constant_initializer(w_t.eval())
@@ -254,29 +253,29 @@ def one_kan_layer(inputs,
             w=tf.get_variable('weight',
                                initializer=w_ini(w_t.shape,dtype=precision),
                                trainable=base_trainable)
-            variable_summaries(b, 'weight')
+            variable_summaries(w, 'weight')
             #forward propagation
             if mixed_prec is not None and not final_layer:
                 inputs=tf.cast(inputs,get_precision(mixed_prec['compute_prec']))
                 coeff=tf.cast(coeff,get_precision(mixed_prec['compute_prec']))
                 w=tf.cast(w,get_precision(mixed_prec['compute_prec']))
                 scale_bias=tf.cast(scale_bias,get_precision(mixed_prec['compute_prec']))
-                scale_base=tf.cast(scale_base,get_precision(mixed_prec['compute_prec']))
+            #normalization of weights
+            w=w/tf.sqrt(tf.math.reduce_sum(tf.square(w)))
             delta_l=tf.cast(2.0,inputs.dtype)/tf.cast(num,inputs.dtype)
             #scales,seg_idx_l,seg_idx_h,mods: (batch)
-            scales=tf.cast(1-1e-6,w.dtype)*(tf.einsum(inputs,w,'ij,j->i')/tf.sqrt(shape[1])+tf.cast(1.0+1e-6,w.dtype))
-            seg_idx_l=tf.math.floordiv(scales,delta_l,tf.int32)
+            scales=tf.cast(1-1e-6,w.dtype)*(tf.einsum('ij,j->i',inputs,w)/tf.sqrt(tf.cast(shape[1],w.dtype))+tf.cast(1.0+1e-6,w.dtype))
+            seg_idx_l=tf.cast(tf.math.floordiv(scales,delta_l),tf.int32)
             seg_idx_h=seg_idx_l+tf.cast(1,tf.int32)
-            mods=tf.math.floormod(scales,delta_l,coeff.dtype)
+            #mods: (batch,1,1)
+            mods=scales-tf.cast(seg_idx_l,w.dtype)*delta_l
+            #mods=tf.cast(tf.math.floormod(scales,delta_l),coeff.dtype)
+            mods=tf.expand_dims(tf.expand_dims(mods,axis=-1),axis=-1)
             #hidden_base: (batch, in, out)
-            hidden_base=tf.transpose(coeff[:,:,seg_idx_l],perm=[2,0,1])
-            if degree>0:
-                #mods: (batch, 1, 1)
-                mods=tf.expand_dims(tf.expand_dims(mods,axis=-1),axis=-1)
-                hidden_base_h=coeff[:,:,seg_idx_h]
-                hidden_base=hidden_base*(tf.cast(1.0,mods.dtype)-mods)+hidden_base_h*mods
+            hidden_base=tf.transpose(tf.gather(coeff,seg_idx_l,axis=-1),perm=[2,0,1])
+            hidden_base_h=tf.transpose(tf.gather(coeff,seg_idx_h,axis=-1),perm=[2,0,1])
+            hidden_base=hidden_base*(tf.cast(1.0,mods.dtype)-mods)+hidden_base_h*mods
             hidden_base=tf.einsum('ijk,ij->ijk',hidden_base,inputs)
-            hidden_base=hidden_base+tf.expand_dims(tf.expand_dims(b,axis=0),axis=-1)
         elif base_function=='fourier':
             #map inputs into [-pi, pi]
             inputs=tf.constant(3.1415926535,dtype=precision)*tf.tanh(inputs)
@@ -419,7 +418,7 @@ def one_kan_layer(inputs,
         else:
             pass
 
-        if bias_function=='silu' and base_function!='segment':
+        if bias_function=='silu' and (base_function not in ['segment','segment_v2']):
             #hidden_bias: (batch, in ,out)
             x=tf.tile(tf.expand_dims(inputs,axis=-1),[1,1,outputs_size])
             hidden_bias=tf.nn.silu(x)*scale_bias
