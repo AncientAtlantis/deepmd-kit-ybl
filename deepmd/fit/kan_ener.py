@@ -86,10 +86,11 @@ class KanEnerFitting (Fitting):
                   grid_range : List[float]=[-1.0,1.0],
                   num : int=5,
                   noise_scale : float=0.1,
-                  scale_base : float=1.0,
                   bias_function : str='silu',
                   scale_bias_miu : float=0.0,
                   scale_bias_sigma : float=1.0,
+                  scale_base_miu : float=0.0,
+                  scale_base_sigma : float=1.0,
                   bias_trainable : bool=True,
                   base_trainable : bool=True,
                   degree: int=2
@@ -156,10 +157,11 @@ class KanEnerFitting (Fitting):
             self.kan_param_dict['grid_range']=grid_range
             self.kan_param_dict['num']=num
             self.kan_param_dict['noise_scale']=noise_scale
-            self.kan_param_dict['scale_base']=scale_base
             self.kan_param_dict['bias_function']=bias_function
             self.kan_param_dict['scale_bias_miu']=scale_bias_miu
             self.kan_param_dict['scale_bias_sigma']=scale_bias_sigma
+            self.kan_param_dict['scale_base_miu']=scale_base_miu
+            self.kan_param_dict['scale_base_sigma']=scale_base_sigma
             self.kan_param_dict['bias_trainable']=bias_trainable 
             self.kan_param_dict['base_trainable']=base_trainable
             self.kan_param_dict['degree']=degree

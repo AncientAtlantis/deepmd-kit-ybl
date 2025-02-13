@@ -290,10 +290,12 @@ def fitting_ener_kan():
     doc_grid_range = 'The initial grid range for B-spline function'
     doc_num = 'Number of grids intervals'
     doc_noise_scale = 'The initial spline curves'
-    doc_scale_base = 'The scale factor of base function'
+    doc_bias_function = 'The type of bias function'
     doc_bias_function = 'The type of bias function'
     doc_scale_bias_miu = 'The initialization factor of bias function'
     doc_scale_bias_sigma = 'The initialization factor of bias function'
+    doc_scale_base_miu = 'The initialization factor of base function'
+    doc_scale_base_sigma = 'The initialization factor of base function'
     doc_bias_trainable = 'Specify the trainable of bias function'
     doc_base_trainable = 'The base functioin trainable'
     doc_degree = 'The degree of relu'
@@ -310,9 +312,10 @@ def fitting_ener_kan():
         Argument("grid_range", list, optional = True, default = [-1,1], doc = doc_grid_range),
         Argument("num", int, optional = True, default = 5, doc = doc_num),
         Argument("noise_scale", float, optional = True, default = 0.1, doc = doc_noise_scale),
-        Argument("scale_base", float, optional = True, default = 1.0, doc = doc_scale_base),
-        Argument("bias_function", str, optional = True, default = 'silu', doc = doc_bias_function),
+        Argument("bias_function", None, optional = True, default = None, doc = doc_bias_function),
         Argument("scale_bias_miu", float, optional = True, default = 0.0, doc = doc_scale_bias_miu),
+        Argument("scale_base_miu", float, optional = True, default = 0.0, doc = doc_scale_bias_miu),
+        Argument("scale_base_sigma", float, optional = True, default = 1.0, doc = doc_scale_bias_miu),
         Argument("scale_bias_sigma", float, optional = True, default = 1.0, doc = doc_scale_bias_sigma),
         Argument("bias_trainable", bool, optional = True, default = True, doc = doc_bias_trainable),
         Argument("base_trainable", bool, optional = True, default = True, doc = doc_base_trainable),
